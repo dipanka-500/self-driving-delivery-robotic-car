@@ -104,13 +104,9 @@ void read_mpu_6050_data() {
 // Utility Functions
 void ISR_count1() { counter1++; }
 void ISR_count2() { counter2++; }
-void ISR_timerone() {
-    Timer1.detachInterrupt();
-    Timer1.attachInterrupt(ISR_timerone);
-}
+
 
 DistanceResult getDistanceTravel() {
-    Timer1.detachInterrupt();
     
     float rotation1 = (counter1 / DISK_SLOTS) * 60.00;
     float distance1 = rotation1 * WHEEL_CIRCUMFERENCE * 60;
@@ -120,7 +116,7 @@ DistanceResult getDistanceTravel() {
     float distance2 = rotation2 * WHEEL_CIRCUMFERENCE * 60;
     counter2 = 0;
     
-    Timer1.attachInterrupt(ISR_timerone);
+    
     
     return {distance1, distance2};
 }
@@ -333,10 +329,7 @@ void setup() {
     Wire.begin(0x08);
     Wire.onReceive(receiveEvent);
     
-    Timer1.initialize(1000000);
-    attachInterrupt(digitalPinToInterrupt(MOTOR1), ISR_count1, RISING);
-    attachInterrupt(digitalPinToInterrupt(MOTOR2), ISR_count2, RISING);
-    Timer1.attachInterrupt(ISR_timerone);
+    
     
     myServo.attach(SERVO_PIN);
     myServo.write(90);
@@ -360,7 +353,21 @@ void setup() {
     gyro_x_cal /= 1000;
     gyro_y_cal /= 1000;
     gyro_z_cal /= 1000;
+    pinMode(MOTOR2, INPUT);
+    pinMode(MOTOR1, INPUT);
+    TCCR2A = 0;              // Reset Timer2 control registers
+  TCCR2B = 0;
+  TCNT2 = 0;               // Initialize counter value to 0
+  OCR2A = 15624;           // Set compare match register for 1 Hz increments
+  TCCR2B |= (1 << WGM22);  // Turn on CTC mode
+  TCCR2B |= (1 << CS22) | (1 << CS21) | (1 << CS20);  // Set CS22, CS21, and CS20 for 1024 prescaler
+  TIMSK2 |= (1 << OCIE2A); // Enable timer compare interrupt
+
+  // Attach interrupts to pins
+  attachInterrupt(digitalPinToInterrupt(MOTOR1), ISR_count1, RISING);  // Motor 1 sensor
+  attachInterrupt(digitalPinToInterrupt(MOTOR2), ISR_count2, RISING);  // Motor 2 sensor
     
+    loop_timer = micros();
     rotateMotor(0, 0);
 }
 
